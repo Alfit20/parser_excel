@@ -4,14 +4,21 @@ import com.example.parser_excel.model.Payment;
 import com.example.parser_excel.model.Transaction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,7 +29,7 @@ public class PaymentService {
 
     private final Transaction transaction;
 
-    public Transaction read(MultipartFile file) throws IOException {
+    public Transaction readXlsx(MultipartFile file) throws IOException {
         List<Payment> payments = new ArrayList<>();
         Workbook workbook = new XSSFWorkbook(file.getInputStream());
         Sheet worksheet = workbook.getSheetAt(0);
@@ -56,5 +63,32 @@ public class PaymentService {
         transaction.setTotalAmount(totalAmount);
         transaction.setTotalCommission(totalCommission);
         return transaction;
+    }
+
+    public List<Payment> readXls(MultipartFile file) throws IOException {
+        HSSFWorkbook wb = new HSSFWorkbook(file.getInputStream());
+        Sheet sheet = wb.getSheetAt(0);
+        List<Payment> payments = new ArrayList<>();
+        log.info("Парсинг файла xls");
+        try {
+            for (int i = 4; i < sheet.getPhysicalNumberOfRows(); i++) {
+                Row row = sheet.getRow(i);
+                String date = row.getCell(0).getStringCellValue();
+                String account = row.getCell(1).getStringCellValue();
+                Double sum = row.getCell(2).getNumericCellValue();
+                String num = row.getCell(3).getStringCellValue();
+                double commission = Double.parseDouble(num);
+                Payment payment = new Payment();
+                payment.setDate(date);
+                payment.setPersonalAccount(account);
+                payment.setSum(sum);
+                payment.setCommission(commission);
+                payments.add(payment);
+            }
+        } catch (NumberFormatException | IllegalStateException e) {
+            log.error("Пустое поле или строка в xls фале! {}", e.getMessage());
+            e.printStackTrace();
+        }
+        return payments;
     }
 }
